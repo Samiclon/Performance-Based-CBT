@@ -1,0 +1,113 @@
+:root{
+  --bg1:#eef2ff; --bg2:#f3e8ff; --card:#fff;
+  --accent1:#6a11cb; --accent2:#2575fc;
+  --ink:#0f172a; --muted:#6b7280;
+  --danger:#d32f2f; --success:#10b981;
+  --radius:14px; --container: min(1200px, 96vw);
+}
+*{box-sizing:border-box}
+html,body{margin:0; padding:0; min-height:100%;
+  background:linear-gradient(180deg,var(--bg1),var(--bg2));
+  font-family:Inter,system-ui,"Segoe UI",Roboto,Arial,sans-serif;
+  color:var(--ink); overflow-x:hidden; text-align:center;}
+body{padding:clamp(8px,1.6vw,18px)}
+
+.app{width:var(--container); max-width:100%; margin:0 auto; text-align:left;
+  background:linear-gradient(180deg,rgba(255,255,255,0.98),#fbfbff);
+  border:1px solid rgba(124,77,255,0.06);
+  border-radius:18px; box-shadow:0 20px 40px rgba(15,23,42,0.08);}
+header{padding:16px; text-align:center; background:linear-gradient(90deg,var(--accent1),var(--accent2)); color:#fff}
+header h1{margin:0; font-size:18px}
+header p{margin:6px 0 0; font-size:12px; opacity:.95}
+
+/* Layout */
+.layout{display:grid; grid-template-columns:1fr; gap:12px; padding:12px;}
+@media (min-width:900px){
+  .layout{ grid-template-columns:clamp(300px,28vw,380px) 1fr; align-items:start; gap:clamp(12px,2vw,18px); }
+}
+
+.panel{background:var(--card); border:1px solid #e9ecff; border-radius:12px; padding:12px;}
+.row{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+label{display:block; font-weight:700; color:#334155; font-size:13px; margin-bottom:6px}
+input[type="text"]{flex:1; min-width:200px; padding:12px; border:1px solid #eef3ff; border-radius:10px; font-size:14px}
+.btn{padding:10px 14px; border-radius:10px; border:none; cursor:pointer;
+  background:linear-gradient(90deg,var(--accent1),var(--accent2)); color:#fff; font-weight:700;
+  box-shadow:0 6px 18px rgba(92,109,255,0.08)}
+.btn.ghost{background:#fff; color:var(--accent1); border:1px solid #cfd7ff; box-shadow:none}
+.btn.warn{background:linear-gradient(90deg,#ff6b6b,#d32f2f)}
+.btn:disabled{opacity:.6; cursor:not-allowed}
+.small{font-size:12px; color:#6b7280}
+.tag{font-size:11px; padding:4px 8px; border-radius:999px; background:#eef2ff; color:#334155}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+
+/* Timer */
+.panelTimer{position:sticky; top:0; z-index:10; display:flex; justify-content:center; align-items:center;
+  gap:12px; padding:12px; margin-bottom:12px; background:#ffffffee; border-radius:14px; border:1px solid #e5e7ff; backdrop-filter:saturate(1.05) blur(2px);}
+.timerBox{display:flex; align-items:center; gap:10px; font-weight:700}
+#timer{color:var(--danger); padding:6px 14px; background:#fff; border-radius:10px; border:1px solid #f3dada; font-size:20px; font-weight:800}
+.qMeta{font-size:18px; font-weight:800; color:#0f172a}
+
+/* Question + nav */
+.qNavRow{width:100%; display:flex; justify-content:center; align-items:center; gap:12px; margin:12px 0;}
+.qNavRow button{flex:1; max-width:140px; padding:10px 0; border-radius:10px; font-weight:700; background:#fff; border:1px solid #cfd7ff; color:#6a11cb; cursor:pointer;}
+.progressBar{height:8px; background:#f6f8ff; border-radius:999px; overflow:hidden; border:1px solid #e6eaff}
+.progressFill{height:100%; background:linear-gradient(90deg,var(--accent1),var(--accent2)); width:0%}
+.navWrap{max-height:160px; overflow:auto; border:1px solid #eef1ff; border-radius:10px; padding:8px; background:#fff}
+.jumpGrid{display:flex; flex-wrap:wrap; gap:6px}
+.jumpBtn{width:34px; height:34px; border:1px solid #e3e8ff; border-radius:8px; background:#f0f5ff; cursor:pointer; font-weight:700; line-height:1}
+.jumpBtn.answered{background:#cfe4ff}
+.jumpBtn.marked{background:#fff7e6}
+.jumpBtn.current{background:#fff; border-color:#6a11cb; color:#6a11cb; box-shadow:0 0 0 2px #e9ddff inset, 0 2px 6px rgba(106,17,203,.18); animation:pulse 1.2s ease-out infinite;}
+@keyframes pulse{0%{box-shadow:0 0 0 2px #e9ddff inset, 0 0 0 0 rgba(106,17,203,.35)} 70%{box-shadow:0 0 0 2px #e9ddff inset, 0 0 0 8px rgba(106,17,203,0)} 100%{box-shadow:0 0 0 2px #e9ddff inset, 0 0 0 0 rgba(106,17,203,0)}}
+
+/* Question card & tables */
+.questionCard{background:#fff; border:1px solid #eee; border-radius:12px; padding:12px}
+.qhead{display:flex; justify-content:space-between; gap:8px; align-items:center; margin-bottom:8px}
+.qtext{font-size:17px; font-weight:700; margin:6px 0 10px}
+.options label{display:block; padding:10px; margin-bottom:8px; border-radius:10px; border:1px solid #e9efff; background:#f8fbff; cursor:pointer}
+.tableWrap{width:100%;overflow:auto;border:1px solid #eef1ff;border-radius:10px;background:#fff}
+table{width:100%;border-collapse:collapse;min-width:720px}
+th,td{padding:8px;border-bottom:1px solid #f0f2ff;text-align:left;vertical-align:top}
+th{font-size:12px;color:#475569;background:#fafbff;position:sticky;top:0}
+td{font-size:13px;line-height:1.3}
+.metricGrid{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px}
+.metric{border:1px solid #eef1ff; background:#fff; border-radius:12px; padding:12px; text-align:center}
+.metricLabel{font-size:12px; color:#475569}
+.metricValue{font-size:20px; font-weight:800; margin-top:4px}
+
+/* === Results: Vertical Tabs (desktop only) === */
+.resultsDesktop .vtabs-wrap{display:flex; gap:16px}
+.vtabs{min-width:210px; display:none; flex-direction:column; gap:8px}
+.vtab{all:unset; padding:10px 12px; border-radius:10px; border:1px solid #e6eaff; cursor:pointer; background:#fff; font-weight:700; color:#334155}
+.vtab.active{border-color:#6a11cb; color:#6a11cb; box-shadow:0 0 0 2px #ede7ff inset}
+.vpanes{flex:1; min-width:0}
+.vpane{display:none}
+.vpane.active{display:block}
+.metricsRow{justify-content:space-evenly; gap:10px; flex-wrap:wrap}
+
+/* Show vertical tabs on >=900px */
+@media (min-width:900px){ .vtabs{display:flex} }
+
+/* Mobile results visibility */
+#resultDesktop{display:none}
+#resultMobile{display:block}
+@media (min-width:900px){
+  #resultDesktop{display:block}
+  #resultMobile{display:none}
+}
+
+/* Full-bleed results mode & hide controls */
+.results-mode .layout{grid-template-columns:1fr}
+.results-mode #controlsPanel{display:none !important}
+@media (min-width:900px){
+  .results-mode #resultDesktop{
+    width:100vw; margin-left:calc(50% - 50vw); margin-right:calc(50% - 50vw);
+    border-radius:0; border-left:none; border-right:none;
+  }
+  /* widen tables a bit for breathing room */
+  .results-mode #resultDesktop table{min-width:1000px}
+}
+
+/* Small responsive tweaks */
+@media (max-width:560px){ .metricGrid{grid-template-columns:repeat(2,minmax(0,1fr))} }
+@media (max-width:400px){ .metricGrid{grid-template-columns:1fr} }
