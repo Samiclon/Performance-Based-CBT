@@ -1,0 +1,552 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Performance Based CBT — Admin (with Scheduler)</title><!-- jsPDF for PDF export --><script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script><style>
+  :root{
+    --bg1:#eef2ff;--bg2:#f3e8ff;--card:#fff;
+    --accent1:#6a11cb;--accent2:#2575fc;
+    --muted:#6b7280;--danger:#d32f2f;--success:#10b981;
+    --radius:14px;
+    --max-width:980px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;padding:18px;min-height:100%;
+    background:linear-gradient(180deg,var(--bg1),var(--bg2));
+    font-family:Inter,system-ui,"Segoe UI",Roboto,Arial;
+    color:#0f172a;
+  }
+  .app{max-width:var(--max-width);margin:0 auto;background:#fff;border-radius:18px;border:1px solid #e5e7ff;box-shadow:0 20px 40px rgba(0,0,0,.08)}
+  header{padding:18px;background:linear-gradient(90deg,var(--accent1),var(--accent2));color:#fff;text-align:center;border-radius:18px 18px 0 0}
+  header h1{margin:0;font-size:20px}
+  .panel{background:#fff;border:1px solid #e9ecff;border-radius:14px;padding:14px;margin:14px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  input,select{padding:10px;border:1px solid #dfe3ff;border-radius:10px;font-size:14px}
+  .btn{padding:10px 14px;border-radius:10px;border:none;cursor:pointer;font-weight:700;color:#fff;background:linear-gradient(90deg,var(--accent1),var(--accent2))}
+  .btn.ghost{background:#fff;border:1px solid #dfe3ff;color:var(--accent1)}
+  .btn.warn{background:linear-gradient(90deg,#ff6b6b,var(--danger));color:#fff}
+  .btn.flat{background:#fff;border:1px solid #e6eaff;color:#334155}
+  .small{font-size:12px;color:var(--muted)}
+  .tableWrap{overflow:auto;border-radius:10px;border:1px solid #e9ecff;margin-top:10px;background:#fff}
+  table{width:100%;border-collapse:collapse;min-width:750px}
+  th,td{padding:8px;border-bottom:1px solid #eef1ff;font-size:13px;text-align:left;vertical-align:top}
+  th{font-size:12px;color:#475569;background:#fafaff}
+  th.sortable{cursor:pointer}
+  th.sortable span{font-size:11px;color:#9aa3b2;margin-left:6px}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .pill{padding:3px 8px;border-radius:999px;font-size:11px;background:#eef2ff}
+  .statusDot{display:inline-block;width:8px;height:8px;border-radius:999px;margin-right:6px}
+
+  /* PIN overlay */
+  .lockScreen{
+    position:fixed; inset:0; background:linear-gradient(180deg,var(--bg1),var(--bg2));
+    display:flex; align-items:center; justify-content:center; z-index:99999;
+  }
+  .lockCard{
+    width:min(420px,92vw); background:#fff; border:1px solid #e9ecff; border-radius:14px;
+    padding:16px; box-shadow:0 20px 40px rgba(0,0,0,.12); text-align:center;
+  }
+  .lockCard h2{margin:4px 0 8px}
+</style></head>
+<body><!-- ===== PIN LOCK (Option A) ===== --><div class="lockScreen" id="lockScreen" aria-modal="true" role="dialog">
+  <div class="lockCard">
+    <h2>Admin Access</h2>
+    <p class="small" style="margin-top:0">Enter PIN to open the Admin dashboard.</p>
+    <div class="row" style="justify-content:center">
+      <input type="password" id="pinInput" inputmode="numeric" pattern="[0-9]*" placeholder="Enter PIN" style="width:200px;text-align:center;font-weight:800;letter-spacing:2px">
+      <button class="btn" id="pinGo">Unlock</button>
+    </div>
+    <p id="pinMsg" class="small" style="margin-top:8px;color:var(--muted)"></p>
+  </div>
+</div><div class="app" id="app" style="display:none">
+  <header><h1>Teacher / Admin</h1></header>  <!-- ✅ EXAM SCHEDULER -->  <div class="panel">
+    <h3 style="margin:0 0 10px">Exam Scheduler (Start Time & Duration)</h3><div class="row">
+  <div style="flex:1;min-width:220px">
+    <label class="small">Official Start (local)</label>
+    <input type="datetime-local" id="schDateTime" />
+  </div>
+  <div style="flex:0 0 160px">
+    <label class="small">Duration (minutes)</label>
+    <input type="number" id="schDuration" min="5" step="5" value="150" />
+  </div>
+</div>
+
+<div class="row" style="margin-top:12px">
+  <button class="btn" id="saveSchedule">Save Schedule</button>
+  <button class="btn flat" id="startNow">Start Now</button>
+  <button class="btn ghost" id="clearSchedule">Clear Schedule</button>
+</div>
+
+<p class="small" id="schStatus" style="margin-top:6px;color:var(--muted)">No schedule configured.</p>
+<p class="small">Keys used by student app: <span class="pill mono">plp256_cbt_exam</span>, <span class="pill mono">plp256_cbt_override_duration</span></p>
+
+  </div>  <!-- ✅ STUDENT CONTROLS -->  <div class="panel">
+    <h3 style="margin:0 0 10px">Student Controls</h3>
+    <div class="row">
+      <input id="studentInput" type="text" placeholder="Enter full name" style="flex:1" />
+      <button class="btn ghost" id="viewBtn">View Result</button>
+      <button class="btn warn" id="unlockBtn">Unlock</button>
+      <button class="btn flat" id="resetAllBtn" title="Soft reset: clears only CBT keys">Reset All Students</button>
+    </div>
+    <p class="small">Unlock clears attempt + submitted result for that student. <strong>Reset All</strong> safely removes only <span class="mono">plp256_cbt_*</span> keys.</p>
+  </div>  <!-- ✅ LIVE MONITORING -->  <div class="panel">
+    <h3 style="margin:0 0 10px">Live Monitoring — Active Students <span id="liveCount" class="small"></span></h3>
+    <div class="tableWrap" id="liveArea"><div style="padding:10px">No active students.</div></div>
+    <p class="small">Auto-refreshes every 5s • Shows progress without revealing question text.</p>
+  </div>  <!-- ✅ ALL SUBMISSIONS + TOOLS -->  <div class="panel">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <h3 style="margin:0 0 10px">All Submissions on This Device</h3>
+      <div class="row">
+        <input id="searchInput" type="text" placeholder="Search name…" />
+        <button class="btn flat" id="exportCsvBtn">Export CSV</button>
+      </div>
+    </div>
+    <div class="tableWrap" id="listArea"></div>
+  </div>  <div class="panel" id="resultArea" style="display:none"></div>
+</div><script>
+/* ========================================================
+   🔐 PIN GATE — Option A (hard-coded)
+   ======================================================== */
+const ADMIN_PIN = "1234"; // ← CHANGE THIS
+const LOCK_KEY  = "plp256_admin_ok";
+
+const lockScreen = document.getElementById('lockScreen');
+const appRoot    = document.getElementById('app');
+const pinInput   = document.getElementById('pinInput');
+const pinGo      = document.getElementById('pinGo');
+const pinMsg     = document.getElementById('pinMsg');
+
+function openApp(){
+  lockScreen.style.display='none';
+  appRoot.style.display='block';
+}
+
+if (sessionStorage.getItem(LOCK_KEY) === 'yes') openApp();
+
+pinGo.onclick = ()=>{
+  const v = (pinInput.value||'').trim();
+  if(!v){ pinMsg.textContent='Enter the PIN.'; return; }
+  if(v === ADMIN_PIN){
+    sessionStorage.setItem(LOCK_KEY, 'yes');
+    openApp();
+  } else {
+    pinMsg.textContent = 'Incorrect PIN.';
+  }
+};
+pinInput.addEventListener('keydown', e=>{
+  if(e.key==='Enter') pinGo.click();
+});
+
+/* ========================================================
+   ✅ EXAM SCHEDULER ENGINE (student-compatible keys)
+   ======================================================== */
+const EXAM_KEY = 'plp256_cbt_exam'; // { startAt, durationSeconds, createdAt }
+const OVERRIDE_DURATION_KEY = 'plp256_cbt_override_duration'; // seconds
+
+const schDateTime = document.getElementById('schDateTime');
+const schDuration = document.getElementById('schDuration');
+const schStatus   = document.getElementById('schStatus');
+const saveScheduleBtn = document.getElementById('saveSchedule');
+const clearScheduleBtn = document.getElementById('clearSchedule');
+const startNowBtn  = document.getElementById('startNow');
+
+const pad2 = n => (n<10?'0':'')+n;
+const hms = (sec)=>{ if(sec<0)sec=0; const h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60), s=sec%60; return `${pad2(h)}:${pad2(m)}:${pad2(s)}`; };
+const nowSecs = ()=> Math.floor(Date.now()/1000);
+
+function loadScheduleIntoUI(){
+  const raw = localStorage.getItem(EXAM_KEY);
+  if(!raw){ schStatus.textContent='No schedule configured.'; return; }
+  try{
+    const ex = JSON.parse(raw);
+    const dt = new Date((ex.startAt|0)*1000);
+    // Set datetime-local value in local time
+    schDateTime.value = new Date(dt.getTime()-dt.getTimezoneOffset()*60000).toISOString().slice(0,16);
+    schDuration.value = Math.max(5, Math.round((ex.durationSeconds||0)/60));
+  }catch{ /* ignore */ }
+}
+
+function saveSchedule(startEpochSec, durationMinutes){
+  const payload = {
+    startAt: startEpochSec|0,
+    durationSeconds: Math.max(60, (durationMinutes|0)*60),
+    createdAt: nowSecs()
+  };
+  localStorage.setItem(EXAM_KEY, JSON.stringify(payload));
+  localStorage.setItem(OVERRIDE_DURATION_KEY, String(payload.durationSeconds));
+  updateScheduleStatus();
+  alert('Exam schedule saved.');
+}
+
+function updateScheduleStatus(){
+  const raw = localStorage.getItem(EXAM_KEY);
+  if(!raw){ schStatus.innerHTML='No schedule configured.'; return; }
+  let ex; try{ ex=JSON.parse(raw); }catch{ schStatus.textContent='Schedule corrupted.'; return; }
+  const now = nowSecs();
+  const start = ex.startAt|0;
+  const end = start + (ex.durationSeconds||0);
+
+  let status='', dot='#9aa3b2';
+  if(now < start){
+    status = `Exam <strong>scheduled</strong>. Starts at <span class="mono">${new Date(start*1000).toLocaleString()}</span>
+              • Duration <span class="mono">${Math.round(ex.durationSeconds/60)}m</span>
+              • Begins in <span class="mono">${hms(start-now)}</span>`;
+    dot = '#f59e0b';
+  }else if(now >= start && now <= end){
+    status = `Exam <strong>LIVE</strong> • Ends in <span class="mono">${hms(end-now)}</span>`;
+    dot = '#10b981';
+  }else{
+    status = `Exam <strong>ended</strong> at <span class="mono">${new Date(end*1000).toLocaleString()}</span>`;
+    dot = '#d32f2f';
+  }
+  schStatus.innerHTML = `<span class="statusDot" style="background:${dot}"></span>${status}`;
+}
+
+saveScheduleBtn.onclick = ()=>{
+  if(!schDateTime.value) return alert('Choose the official start date & time.');
+  const dt = new Date(schDateTime.value);
+  if(isNaN(dt.getTime())) return alert('Invalid date/time.');
+  const mins = parseInt(schDuration.value||'150',10);
+  if(!mins || mins<5) return alert('Duration should be at least 5 minutes.');
+  const epoch = Math.floor(dt.getTime()/1000);
+  saveSchedule(epoch, mins);
+};
+startNowBtn.onclick = ()=>{
+  const mins = parseInt(schDuration.value||'150',10);
+  saveSchedule(nowSecs(), mins);
+};
+clearScheduleBtn.onclick = ()=>{
+  if(!confirm('Clear the saved schedule?')) return;
+  localStorage.removeItem(EXAM_KEY);
+  localStorage.removeItem(OVERRIDE_DURATION_KEY);
+  schStatus.textContent='No schedule configured.';
+  schDateTime.value='';
+  schDuration.value='150';
+};
+
+// status ticker
+setInterval(updateScheduleStatus, 1000);
+
+/* ========================================================
+   ✅ STUDENT VIEW, UNLOCK, LIVE MONITORING + RESULTS ENGINE
+   ======================================================== */
+const STORAGE_PREFIX='plp256_cbt_';
+const SUBMIT_MAP=STORAGE_PREFIX+'submits';
+const LAST_RESULT_PREFIX=STORAGE_PREFIX+'result_';
+const CLOSED_FLAG=STORAGE_PREFIX+'closed';
+
+const studentInput=document.getElementById('studentInput');
+const viewBtn=document.getElementById('viewBtn');
+const unlockBtn=document.getElementById('unlockBtn');
+const resetAllBtn=document.getElementById('resetAllBtn');
+
+const listArea=document.getElementById('listArea');
+const liveArea=document.getElementById('liveArea');
+const liveCount=document.getElementById('liveCount');
+const resultArea=document.getElementById('resultArea');
+
+/* ---------- Helpers ---------- */
+const sanitize=(n)=>n.trim().toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+
+/* ---------- Submissions: search + sort + csv + pdf ---------- */
+const searchInput=document.getElementById('searchInput');
+const exportCsvBtn=document.getElementById('exportCsvBtn');
+let currentSort = { key: 'timestamp', dir: 'desc' };
+
+function getAllSubmissions(){
+  const map=JSON.parse(localStorage.getItem(SUBMIT_MAP)||'{}');
+  const keys=Object.keys(map);
+  const rows=[];
+  keys.forEach(san=>{
+    const raw=localStorage.getItem(LAST_RESULT_PREFIX+san);
+    if(!raw) return;
+    const r=JSON.parse(raw);
+    const pct=Math.round((r.score/r.total)*100);
+    rows.push({
+      san, candidate:r.candidate, pct, score:r.score, total:r.total,
+      timestamp:r.timestamp, timeUsed:r.timeUsed|0
+    });
+  });
+  return rows;
+}
+
+function renderSubmissions(){
+  const q=(searchInput?.value||'').trim().toLowerCase();
+  let data=getAllSubmissions();
+  if(q) data=data.filter(d=> d.candidate.toLowerCase().includes(q));
+
+  // sort
+  data.sort((a,b)=>{
+    const k=currentSort.key;
+    let va=a[k], vb=b[k];
+    if(k==='candidate'){ va=va.toLowerCase(); vb=vb.toLowerCase(); }
+    if(va<vb) return currentSort.dir==='asc'?-1:1;
+    if(va>vb) return currentSort.dir==='asc'?1:-1;
+    return 0;
+  });
+
+  if(data.length===0){
+    listArea.innerHTML='<div style="padding:10px">No submissions.</div>';
+    return;
+  }
+
+  const rows=data.map(d=>`
+    <tr>
+      <td>${d.candidate}</td>
+      <td>${d.pct}% (${d.score}/${d.total})</td>
+      <td class="mono">${d.timestamp}</td>
+      <td class="mono">${hms(d.timeUsed)}</td>
+      <td>
+        <button class="btn ghost" data-view="${d.san}">View</button>
+        <button class="btn" data-pdf="${d.san}">PDF</button>
+        <button class="btn warn" data-unlock="${d.san}">Unlock</button>
+      </td>
+    </tr>
+  `).join('');
+
+  listArea.innerHTML=`
+    <table>
+      <thead>
+        <tr>
+          <th class="sortable" data-k="candidate">Student <span>⇅</span></th>
+          <th class="sortable" data-k="pct">Score <span>⇅</span></th>
+          <th class="sortable" data-k="timestamp">Submitted <span>⇅</span></th>
+          <th class="sortable" data-k="timeUsed">Time Used <span>⇅</span></th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+
+  listArea.querySelectorAll('[data-view]').forEach(b=> b.onclick=()=>viewResultBySan(b.dataset.view));
+  listArea.querySelectorAll('[data-pdf]').forEach(b=> b.onclick=()=>pdfBySan(b.dataset.pdf));
+  listArea.querySelectorAll('[data-unlock]').forEach(b=> b.onclick=()=>unlockBySan(b.dataset.unlock));
+  listArea.querySelectorAll('th.sortable').forEach(th=>{
+    th.onclick=()=>{
+      const k=th.dataset.k;
+      if(currentSort.key===k){ currentSort.dir = currentSort.dir==='asc'?'desc':'asc'; }
+      else { currentSort.key=k; currentSort.dir='asc'; }
+      renderSubmissions();
+    };
+  });
+}
+
+searchInput.addEventListener('input', renderSubmissions);
+
+exportCsvBtn.onclick=()=>{
+  const data=getAllSubmissions();
+  if(data.length===0) return alert('No submissions to export.');
+  const header=['Student','Percent','Score','Total','Submitted','TimeUsedSec'];
+  const lines=[header.join(',')];
+  data.forEach(d=>{
+    lines.push([
+      `"${String(d.candidate).replace(/"/g,'""')}"`,
+      d.pct, d.score, d.total,
+      `"${String(d.timestamp).replace(/"/g,'""')}"`,
+      d.timeUsed
+    ].join(','));
+  });
+  const blob=new Blob([lines.join('\n')], {type:'text/csv'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='cbt_submissions.csv';
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(url); a.remove();},400);
+};
+
+/* ---------- Live Monitoring ---------- */
+function loadActive(){
+  let rows='';
+  let active=0;
+  for(let i=0;i<localStorage.length;i++){
+    const key=localStorage.key(i);
+    if(!key.startsWith(STORAGE_PREFIX)) continue;
+    if(key.includes('result_') || key.includes('submits') || key.includes('closed') || key.includes('exam') || key.includes('override_duration')) continue;
+    const raw=localStorage.getItem(key);
+    if(!raw) continue;
+    let s; try{s=JSON.parse(raw);}catch{continue;}
+    if(!s || !s.started || s.submitted) continue;
+    active++;
+    rows+=`
+      <tr>
+        <td>${s.candidate}</td>
+        <td>${s.index+1} / ${s.quiz.length}</td>
+        <td>${s.answers.filter(a=>a!=null).length}</td>
+        <td>${s.marked.filter(Boolean).length}</td>
+        <td class="mono">${hms(s.timeRemaining||0)}</td>
+        <td class="mono">${new Date((s.lastSaved||0)*1000).toLocaleTimeString()}</td>
+        <td>
+          <button class="btn ghost" data-liveview="${s.sanitized}">View</button>
+          <button class="btn warn" data-liveunlock="${s.sanitized}">Unlock</button>
+        </td>
+      </tr>
+    `;
+  }
+  liveCount.textContent = active ? `• ${active} active` : '';
+  if(!rows){
+    liveArea.innerHTML='<div style="padding:10px">No active students.</div>';
+    return;
+  }
+  liveArea.innerHTML=`
+    <table>
+      <thead><tr><th>Student</th><th>Q#</th><th>Answered</th><th>Marked</th><th>Time Left</th><th>Last Saved</th><th>Actions</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+  liveArea.querySelectorAll('[data-liveview]').forEach(b=> b.onclick=()=>viewResultBySan(b.dataset.liveview));
+  liveArea.querySelectorAll('[data-liveunlock]').forEach(b=> b.onclick=()=>unlockBySan(b.dataset.liveunlock));
+}
+// auto-refresh
+setInterval(loadActive, 5000);
+
+/* ---------- Results viewer ---------- */
+function viewResultBySan(san){
+  const raw=localStorage.getItem(LAST_RESULT_PREFIX+san);
+  if(!raw){ alert('No result found for this student.'); return; }
+  showResult(JSON.parse(raw));
+}
+function showResult(r){
+  const pct=Math.round((r.score/r.total)*100);
+  const topics=Object.entries(r.topicStats).map(([t,s])=>`
+    <tr><td>${t}</td><td>${s.correct}</td><td>${s.total}</td>
+    <td>${Math.round(s.correct/s.total*100)}%</td>
+    <td class="mono">${hms(s.time)}</td></tr>
+  `).join('');
+  const details=r.details.map(d=>`
+    <tr>
+      <td class="mono">Q${d.index}</td>
+      <td>${d.topic}</td>
+      <td>${d.q}</td>
+      <td>${d.given ?? '<em>None</em>'}</td>
+      <td>${d.answer}</td>
+      <td>${d.correct?'<span style="color:var(--success)">✓</span>':'<span style="color:var(--danger)">✗</span>'}</td>
+      <td class="mono">${hms(d.time)}</td>
+    </tr>
+  `).join('');
+
+  resultArea.style.display='block';
+  resultArea.innerHTML=`
+    <h3>Result — ${r.candidate}</h3>
+    <p class="small mono">Submitted: ${r.timestamp}</p>
+    <p><strong>Score:</strong> ${r.score}/${r.total} (${pct}%)</p>
+
+    <div class="row" style="margin:8px 0">
+      <button class="btn" id="pdfThis">Download PDF</button>
+    </div>
+
+    <h4>Topic Analytics</h4>
+    <div class="tableWrap"><table>
+      <thead><tr><th>Topic</th><th>Correct</th><th>Total</th><th>Accuracy</th><th>Time</th></tr></thead>
+      <tbody>${topics}</tbody>
+    </table></div>
+
+    <h4>Per-question Review</h4>
+    <div class="tableWrap"><table>
+      <thead><tr><th>#</th><th>Topic</th><th>Question</th><th>Ans</th><th>Correct</th><th>✓/✗</th><th>Time</th></tr></thead>
+      <tbody>${details}</tbody>
+    </table></div>
+  `;
+  document.getElementById('pdfThis').onclick = ()=> pdfInline(r);
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+/* ---------- PDF export (row & inline) ---------- */
+function pdfBySan(san){
+  const raw=localStorage.getItem(LAST_RESULT_PREFIX+san);
+  if(!raw) return alert('No result found.');
+  const r=JSON.parse(raw);
+  pdfInline(r);
+}
+function pdfInline(r){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'pt',format:'a4'});
+  let y=40;
+
+  const pct=Math.round((r.score/r.total)*100);
+  const line=(t)=>{ doc.text(String(t),40,y); y+=14; if(y>760){doc.addPage(); y=40;} };
+
+  doc.setFontSize(16); doc.text("Performance Based CBT — Result",40,y); y+=26;
+  doc.setFontSize(12);
+  line(`Candidate: ${r.candidate}`);
+  line(`Score: ${r.score}/${r.total} (${pct}%)`);
+  line(`Submitted: ${r.timestamp}`);
+  line(`Time Used: ${hms(r.timeUsed|0)}`);
+  y+=6; line("Topic Breakdown:");
+
+  for(const t in r.topicStats){
+    const s=r.topicStats[t];
+    line(`${t}: ${s.correct}/${s.total} (${Math.round(s.correct/s.total*100)}%) • ${hms(s.time)}`);
+  }
+  y+=8; line("Per-question:");
+  r.details.forEach(d=>{
+    line(`Q${d.index}: ${d.correct?'✓':'✗'} • ${hms(d.time)} — ${d.q}`);
+  });
+
+  const blob=doc.output("blob");
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download=`${r.candidate.replace(/\s+/g,'_')}_result.pdf`;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{URL.revokeObjectURL(url); a.remove();},500);
+}
+
+/* ---------- Unlock / Reset ---------- */
+function unlockBySan(san){
+  if(!confirm('Unlock this student? Their attempt + submitted flag will be cleared.')) return;
+  const map=JSON.parse(localStorage.getItem(SUBMIT_MAP)||'{}');
+  delete map[san];
+  localStorage.setItem(SUBMIT_MAP, JSON.stringify(map));
+
+  localStorage.removeItem(LAST_RESULT_PREFIX+san);
+  localStorage.removeItem(STORAGE_PREFIX+san);
+
+  alert('Student unlocked.');
+  renderSubmissions(); loadActive();
+}
+unlockBtn.onclick=()=>{
+  const name=studentInput.value.trim(); if(!name) return alert('Enter name.');
+  unlockBySan(sanitize(name));
+};
+viewBtn.onclick=()=>{
+  const name=studentInput.value.trim(); if(!name) return alert('Enter name.');
+  viewResultBySan(sanitize(name));
+};
+
+resetAllBtn.onclick=()=>{
+  if(!confirm('Soft Reset ALL students on THIS device? This removes ONLY keys that start with "plp256_cbt_".')) return;
+  const toDelete=[];
+  for(let i=0;i<localStorage.length;i++){
+    const key=localStorage.key(i);
+    if(key.startsWith(STORAGE_PREFIX)) toDelete.push(key);
+  }
+  toDelete.forEach(k=>localStorage.removeItem(k));
+  alert(`Soft reset complete. Removed ${toDelete.length} CBT keys.`);
+  renderSubmissions(); loadActive(); loadScheduleIntoUI(); updateScheduleStatus();
+};
+
+/* ---------- Init ---------- */
+function wireRowClicks(){
+  listArea.addEventListener('click', (e)=>{
+    const t=e.target;
+    if(t.matches('[data-view]')) viewResultBySan(t.dataset.view);
+    if(t.matches('[data-pdf]'))  pdfBySan(t.dataset.pdf);
+    if(t.matches('[data-unlock]')) unlockBySan(t.dataset.unlock);
+  });
+}
+
+function init(){
+  loadScheduleIntoUI();
+  updateScheduleStatus();
+  renderSubmissions();
+  loadActive();
+  wireRowClicks();
+  // refresh submissions list every 10s (in case new results arrive)
+  setInterval(renderSubmissions, 10000);
+}
+init();
+</script></body>
+</html>
